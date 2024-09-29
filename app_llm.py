@@ -137,7 +137,7 @@ prompt = ChatPromptTemplate.from_messages(
         ("human", "{input}"),
         (
             "system",
-            "Here is the current news data: {news_data}. You should provide answers based on this data."
+            "Here is the current news data: {news_data}. You should provide answers based on this data.Don't give code. Dont generate \n\n like characters."
         ),
     ]
 )
@@ -155,13 +155,15 @@ def chat_with_results(all_results, user_question):
     }
     
     chain = prompt | llm
-    response = chain.invoke(input_data)
+    response = chain.invoke(input_data)[0]
+    print(response)
     
     return response
 
 # Streamlit interface
 def display_data_with_chat():
-    st.title("News Categories Dashboard and Chat")
+    st.title("StockSentinel")
+    st.subheader("Real-time Stock News Analysis for Investment Insights")
 
     # Fetch and display categorized news
     all_results = fetch_and_process_data()
