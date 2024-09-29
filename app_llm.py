@@ -147,7 +147,7 @@ def chat_with_results(all_results, user_question):
     llm = load_llm()
     
     # Format the news data to pass to the LLM
-    news_data = "\n".join([f"{i+1}. {res['Title']}: {res['Summary']}" for i, res in enumerate(all_results)])
+    news_data = " ".join([f"{i+1}. {res['Title']}: {res['Summary']}" for i, res in enumerate(all_results)])
     
     input_data = {
         "input": user_question,
@@ -155,10 +155,19 @@ def chat_with_results(all_results, user_question):
     }
     
     chain = prompt | llm
-    response = chain.invoke(input_data)[0]
-    print(response)
+    response = chain.invoke(input_data)
+
+    # Check if the response is an object and extract the content
+    if hasattr(response, 'content'):
+        response_content = response.content
+    else:
+        response_content = str(response)  # Fallback to converting to string if no content attribute
+
+    # Clean up the response by replacing unwanted characters with desired formatting
+    cleaned_response = response_content.replace("\n\n", "\n").replace("\n", "\n\n")
     
-    return response
+    return cleaned_response
+
 
 # Streamlit interface
 def display_data_with_chat():
@@ -179,9 +188,13 @@ def display_data_with_chat():
     st.subheader("Chat with the News Data")
     user_question = st.text_input("Ask a question based on the news data:")
     
-    if user_question:
-        response = chat_with_results(all_results, user_question)
-        st.write(f"LLM Response: {response}")
+        # Add a submit button
+    if st.button("Submit"):
+        if user_question:
+            response = chat_with_results(all_results, user_question)
+            st.write(f"LLM Response: {response}")
+        else:
+            st.warning("Please enter a question before clicking submit.")
 
 # Run this function in your main block
 if __name__ == "__main__":
