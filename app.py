@@ -9,6 +9,7 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
+from pymongo import MongoClient
 
 # Load spaCy model
 nlp = spacy.load('en_core_web_sm')
@@ -16,12 +17,22 @@ nlp = spacy.load('en_core_web_sm')
 # Load environment variables for API key
 load_dotenv()
 groq_api_key = os.getenv("GROQ_API_KEY")
+# MongoDB_key = os.getenv("Mongo_key")
+
+# Set up MongoDB client
+mongo_client = MongoClient(
+    "mongodb+srv://SiddData:SIDD1204@cluster0.qqkrs6x.mongodb.net/")
+db = mongo_client["stock_news"]  # Database name
 
 # Load LLM
+
+
 def load_llm():
     return ChatGroq(temperature=0.4, model_name="llama3-8b-8192", api_key=groq_api_key)
 
 # Function to get RSS feed URLs
+
+
 def get_url(i):
     urls = [
         'https://www.moneycontrol.com/rss/latestnews.xml',
@@ -33,16 +44,22 @@ def get_url(i):
     return requests.get(urls[i])
 
 # Extract key terms using spaCy NER
+
+
 def extract_key_terms(text):
     doc = nlp(text)
-    key_terms = [ent.text for ent in doc.ents if ent.label_ in {'ORG', 'PERSON', 'GPE', 'PRODUCT'}]
+    key_terms = [ent.text for ent in doc.ents if ent.label_ in {
+        'ORG', 'PERSON', 'GPE', 'PRODUCT'}]
     return key_terms
+
 
 # Generate announcement ID mapping
 announcement_id_map = {}
 current_id = 1
 
 # Function to get or create announcement ID
+
+
 def get_announcement_id(title, summary):
     global current_id
     key_terms = tuple(sorted(set(extract_key_terms(title + ' ' + summary))))
@@ -51,34 +68,33 @@ def get_announcement_id(title, summary):
         current_id += 1
     return announcement_id_map[key_terms]
 
+
 # List of Keywords to match in news
 keywords = {
     "merger": ["merger", "merger proposal", "reverse merger", "merge"],
     "investment": ["investment", "equity investment", "capital infusion", "equity stake", "equity transfer"],
     "partnership": ["partnership", "strategic partnership", "strategic alliance", "joint venture", "partnership deal"],
     "other": [
-        "acquisition", "definitive agreement", "takeover", "takeover speculations", "nearing deal", 
-        "consider sale", "proposal", "proposal to acquire", "non binding offer", "exploring sale", 
-        "including sale", "exploring option", "in talks", "potential offer", "acquisition target", 
-        "buyout", "buyback", "consolidation", "divestiture", "spin-off", "restructuring", 
-        "stake acquisition", "share purchase", "management buyout", "leveraged buyout", 
-        "private equity", "recapitalization", "asset purchase", "friendly takeover", "hostile takeover", 
+        "acquisition", "definitive agreement", "takeover", "takeover speculations", "nearing deal",
+        "consider sale", "proposal", "proposal to acquire", "non binding offer", "exploring sale",
+        "including sale", "exploring option", "in talks", "potential offer", "acquisition target",
+        "buyout", "buyback", "consolidation", "divestiture", "spin-off", "restructuring",
+        "stake acquisition", "share purchase", "management buyout", "leveraged buyout",
+        "private equity", "recapitalization", "asset purchase", "friendly takeover", "hostile takeover",
         "asset sale", "take-private deal", "tender offer", "acquire", "acquires"
     ]
 }
 
 # Updated function to fetch and process data including content
+
+
 def fetch_and_process_data():
     all_results = []  # Collect all results here
     for i in range(5):
         url = get_url(i)
-        soup = BeautifulSoup(url.content, 'xml')
-
+        soup = BeautifulSoup(url.content, 'lxml-xml')
         # Get all news of RSS Feed
         entries = soup.find_all('item')
-
-        # Initialize a list to store the filtered entries
-        filtered_entries = {category: [] for category in keywords}
 
         now = datetime.datetime.now()
 
@@ -111,29 +127,16 @@ def fetch_and_process_data():
                         'Link': link,
                         'Content': content  # Add the fetched content here
                     }
-                    filtered_entries[category].append(result)
+                    # Insert result into MongoDB
+                    # Insert into category collection
+                    db[category].insert_one(result)
                     all_results.append(result)
-
-        # Update dataframes for each category (and save to CSV if needed)
-        for category, entries in filtered_entries.items():
-            new_df = pd.DataFrame(entries)
-            csv_file_path = f'{category}_news.csv'
-
-            if os.path.exists(csv_file_path):
-                try:
-                    existing_df = pd.read_csv(csv_file_path)
-                    combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset='Link')
-                except pd.errors.EmptyDataError:
-                    combined_df = new_df
-            else:
-                combined_df = new_df
-
-            combined_df.to_csv(csv_file_path, index=False)
 
     return all_results  # Return the latest results
 
-
 # Fetch the full news content from the link
+
+
 def fetch_news_content(link):
     try:
         # Fetch the HTML content of the news article
@@ -142,7 +145,6 @@ def fetch_news_content(link):
             soup = BeautifulSoup(response.content, 'html.parser')
 
             # Extract the news content - this will depend on the structure of the webpage
-            # Look for <p> tags or main article sections
             paragraphs = soup.find_all('p')
             content = ' '.join([para.get_text() for para in paragraphs])
 
@@ -153,40 +155,23 @@ def fetch_news_content(link):
         print(f"Error fetching content from {link}: {e}")
         return None
 
-# Update CSV with extracted news content
-def update_csv_with_content(csv_file, progress_bar=None, status_text=None):
-    try:
-        df = pd.read_csv(csv_file)
-        
-        # Check if the 'Content' column already exists
-        if 'Content' not in df.columns:
-            df['Content'] = None  # Initialize the Content column
+# Function to retrieve news from MongoDB by category
 
-        # Fetch and update news content for each link
-        for index, row in df.iterrows():
-            if pd.isna(row['Content']):  # If content is missing, fetch it
-                content = fetch_news_content(row['Link'])
-                if content:
-                    df.at[index, 'Content'] = content
-            # Update the progress bar and status text
-            if progress_bar is not None and status_text is not None:
-                progress_bar.progress((index + 1) / len(df))
-                status_text.text(f"Updating {csv_file}: {index + 1}/{len(df)}")
 
-        # Save the updated CSV
-        df.to_csv(csv_file, index=False)
-    except Exception as e:
-        print(f"Error updating {csv_file}: {e}")
+def retrieve_news_from_mongo(category):
+    return list(db[category].find({}))
 
-# Update all category CSV files with news content
-def update_all_csvs(progress_bar=None, status_text=None):
-    csv_files = ['merger_news.csv', 'investment_news.csv', 'partnership_news.csv', 'other_news.csv']
-    
-    for csv_file in csv_files:
-        print(f"Updating {csv_file} with content...")  # Print to terminal
+# Update all category collections with news content
+
+
+def update_all_mongo_data(progress_bar=None, status_text=None):
+    for category in keywords.keys():
+        print(f"Updating {category} news...")  # Print to terminal
         if status_text is not None:
-            status_text.text(f"Updating {csv_file}...")
-        update_csv_with_content(csv_file, progress_bar, status_text)
+            status_text.text(f"Updating {category} news...")
+        # No need to update content; it's fetched in the main processing function
+        # You can add logic here if you want to update based on certain criteria.
+
 
 # Create prompt for Chat with Results
 prompt = ChatPromptTemplate.from_messages(
@@ -203,22 +188,25 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
+
 def chat_with_paginated_results(all_results, user_question, page_size=5):
     llm = load_llm()
-    
+
     # Create pages of news results
-    paginated_results = [all_results[i:i + page_size] for i in range(0, len(all_results), page_size)]
-    
+    paginated_results = [all_results[i:i + page_size]
+                         for i in range(0, len(all_results), page_size)]
+
     full_response = ""
-    
+
     for page in paginated_results:
-        news_data = " ".join([f"{i+1}. {res['Title']}: {res['Summary']}" for i, res in enumerate(page)])
-        
+        news_data = " ".join(
+            [f"{i+1}. {res['Title']}: {res['Summary']}" for i, res in enumerate(page)])
+
         input_data = {
             "input": user_question,
             "news_data": news_data,
         }
-        
+
         chain = prompt | llm
         response = chain.invoke(input_data)
 
@@ -226,42 +214,45 @@ def chat_with_paginated_results(all_results, user_question, page_size=5):
         if hasattr(response, 'content'):
             response_content = response.content
         else:
-            response_content = str(response)  # Fallback to converting to string if no content attribute
+            # Fallback to converting to string if no content attribute
+            response_content = str(response)
 
         # Clean up the response by replacing unwanted characters with desired formatting
-        cleaned_response = response_content.replace("\n\n", "\n").replace("\n", "\n\n")
-        
+        cleaned_response = response_content.replace(
+            "\n\n", "\n").replace("\n", "\n\n")
+
         full_response += cleaned_response + "\n"
 
     return full_response
 
-
 # Streamlit interface
+
+
 def display_data_with_chat():
     st.title("StockSentinel")
     st.subheader("Real-time Stock News Analysis for Investment Insights")
 
-    # Progress bar and status text for CSV updates
+    # Progress bar and status text for updates
     progress_bar = st.progress(0)
     status_text = st.empty()
 
-    # Update CSVs with content and show progress
-    update_all_csvs(progress_bar, status_text)
-    
+    # Update all category collections
+    update_all_mongo_data(progress_bar, status_text)
+
     # Fetch and display categorized news
     all_results = fetch_and_process_data()
 
     # Display data in Streamlit
     for category in keywords.keys():
         st.subheader(f"{category.capitalize()} News")
-        category_results = [res for res in all_results if category in res['Keywords']]
+        category_results = retrieve_news_from_mongo(category)
         df = pd.DataFrame(category_results)
         st.dataframe(df)
 
     # Chat with results
     st.subheader("Chat with the News Data")
     user_question = st.text_input("Ask a question based on the news data:")
-    
+
     # Add a submit button
     if st.button("Submit"):
         if user_question:
@@ -270,6 +261,7 @@ def display_data_with_chat():
             st.write(f"LLM Response: {response}")
         else:
             st.warning("Please enter a question before clicking submit.")
+
 
 # Run the Streamlit app
 if __name__ == "__main__":

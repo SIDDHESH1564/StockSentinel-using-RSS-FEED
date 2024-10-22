@@ -1,5 +1,6 @@
-.env
+\env
 investment_news.csv
 merger_news.csv
 other_news.csv
 partnership_news.csv
+.env
