@@ -10,9 +10,25 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 from pymongo import MongoClient
+import subprocess
 
-# Load spaCy model
-nlp = spacy.load('en_core_web_sm')
+def install_missing_packages():
+    required_packages = ["bs4", "requests", "spacy", "pandas", "streamlit", 
+                         "pymongo", "langchain", "groq", "python-dotenv", "lxml"]
+    
+    for package in required_packages:
+        try:
+            __import__(package)
+        except ImportError:
+            subprocess.run(["pip", "install", package])
+
+install_missing_packages()
+
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+    nlp = spacy.load("en_core_web_sm")
 
 # Load environment variables for API key
 load_dotenv()
