@@ -8,7 +8,7 @@ groq
 python-dotenv
 lxml
 langchain_groq
-numpy==1.23.5
-spacy==3.6.1
+numpy
+spacy
 thinc>=8.1.8,<8.2.0
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.0/en_core_web_sm-3.6.0.tar.gz
