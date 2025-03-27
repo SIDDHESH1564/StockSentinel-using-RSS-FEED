@@ -4,14 +4,16 @@ import re
 import pandas as pd
 import os
 import datetime
-import spacy
 import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import subprocess
+import sys
 
+subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "numpy==1.23.5"])
+import spacy
 # Ensure spaCy model is installed at runtime
 try:
     nlp = spacy.load("en_core_web_sm")
