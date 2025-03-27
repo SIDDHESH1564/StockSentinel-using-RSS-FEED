@@ -1,13 +1,11 @@
 beautifulsoup4
 requests
-pandas
-bs4
-pymongo
-datetime
-spacy
 streamlit
-langchain_groq
+pandas
+pymongo
+spacy
 langchain
+groq
 python-dotenv
 lxml
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.0/en_core_web_sm-3.6.0.tar.gz
+langchain_groq
