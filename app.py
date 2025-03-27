@@ -12,17 +12,12 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 import subprocess
 
-def install_missing_packages():
-    required_packages = ["bs4", "requests", "spacy", "pandas", "streamlit", 
-                         "pymongo", "langchain", "groq", "python-dotenv", "lxml"]
-    
-    for package in required_packages:
-        try:
-            __import__(package)
-        except ImportError:
-            subprocess.run(["pip", "install", package])
-
-install_missing_packages()
+# Ensure spaCy model is installed at runtime
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+    nlp = spacy.load("en_core_web_sm")
 
 try:
     nlp = spacy.load("en_core_web_sm")
